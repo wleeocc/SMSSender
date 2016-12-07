@@ -1,16 +1,22 @@
 package edu.orangecoastcollege.cs273.smssender;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.ContactsContract;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.telephony.SmsManager;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 
@@ -60,7 +66,12 @@ public class MessageActivity extends AppCompatActivity {
             if (cursor.moveToFirst()){
                 String name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME));
                 String phone = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER));
+                Contact newContact = new Contact(name, phone);
+                db.addContact(newContact);
+                contactsAdapter.add(newContact);
+
             }
+            cursor.close();;
         }
 
     }
@@ -70,6 +81,15 @@ public class MessageActivity extends AppCompatActivity {
 
     public void deleteContact(View view) {
         // TODO: Delete the selected contact from the database and remove the contact from the contactsAdapter.
+
+        if (view instanceof LinearLayout) {
+            Contact selectedContact = (Contact) view.getTag();
+            db.deleteContact(selectedContact.getId());
+            contactsAdapter.remove(selectedContact);
+            Toast.makeText(this, "Contact Deleted: " + selectedContact.getName(), Toast.LENGTH_SHORT).show();
+
+        }
+
     }
 
     public void sendTextMessage(View view) {
@@ -77,5 +97,35 @@ public class MessageActivity extends AppCompatActivity {
         // TODO: Get the default SmsManager, then send a text message to each of the contacts in the list.
         // TODO: Be sure to check for permissions to SEND_SMS and request permissions if necessary.
 
+        String message = messageEditText.getText().toString();
+        if (message.isEmpty()){
+            Toast.makeText(this, "Please enter message text." , Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (contactsList.size() == 0) {
+            Toast.makeText(this, "Please add a contact.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Ask for permission to send SMS
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED){
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.SEND_SMS}, REQUEST_CODE_SEND_SMS);
+        }
+        else {
+
+            // Define a reference to a SmsManager
+            SmsManager manager = SmsManager.getDefault();
+
+            // Loop through contact list to send to multiple contacts
+            for (Contact singleContact : contactsList) {
+                manager.sendTextMessage(singleContact.getPhone(), null, message, null, null);
+            }
+            if (contactsList.size() > 1)
+                Toast.makeText(this, "Message sent to " + contactsList.size() + " contacts.", Toast.LENGTH_SHORT).show();
+            else
+                Toast.makeText(this, "Message sent to " + contactsList.get(0).getName() + ".", Toast.LENGTH_SHORT).show();
+
+        }
     }
 }
